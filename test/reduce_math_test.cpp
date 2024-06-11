@@ -1,7 +1,7 @@
 #include <chrono>
 #include <cstdint>
 #include <iostream>
-#include <random>
+#include <vector>
 
 using namespace std;
 
@@ -25,91 +25,93 @@ unsigned mul_fractions(unsigned a, unsigned b) {
     return a/b * b/a;
 }
 
+template<typename T>
+struct Triple {
+    T a;
+    T b;
+    T c;
+};
+
 class Tester {
-    mt19937 gen;
-    uniform_int_distribution<unsigned> distrib;
     unsigned iterations;
     unsigned repeats;
+    size_t argc;
     
 public:
 
-    Tester(mt19937::result_type seed, unsigned iterations, unsigned repeats) 
-        : gen(seed), distrib(1, 600) {
+    Tester(unsigned iterations, unsigned repeats, size_t argc) {
         this->iterations = iterations;
         this->repeats = repeats;
+        this->argc = argc;
     }
 
     template<typename T>
     void test(T (*f)(T a, T b), const char *message) {
-        int64_t min = INT64_MAX;
+        int64_t minTime = INT64_MAX;
         T ans = 0;
+        vector<Triple<T>> args(argc);
+        for(T i = 0; i < args.size(); i++) {
+            T v = (T) (i % 600);
+            args[i] = {v + 2, v + 1, v};
+        }
 
         for(unsigned i = 0; i < repeats; i++) {
             T res = 0;
             auto start = chrono::high_resolution_clock::now();
             for(unsigned j = 0; j < iterations; j++) {
-                auto a = distrib(gen);
-                auto b = distrib(gen);
+                auto [a, b, c] = args[j % args.size()];
                 T ret = f(a, b);
-                res += ret % 2;
+                res += ret % 2 + 2;
                 res %= 1000000;
             }
             auto end = chrono::high_resolution_clock::now();
 
             auto ms_int = chrono::duration_cast<chrono::milliseconds>(end - start);
             int64_t time = ms_int.count();
-            if(time < min) {
-                min = time;
+            if(time < minTime) {
+                minTime = time;
                 ans = res;
             }
         }
         
-        cout << message << ' ' << min << "ms [out=" << ans << "]\n";
+        cout << message << ' ' << minTime << "ms [out=" << ans << "]\n";
     }
 
     template<typename T>
     void test(T (*f)(T a, T b, T c), const char *message) {
-        int64_t min = INT64_MAX;
+        int64_t minTime = INT64_MAX;
         T ans = 0;
+        vector<Triple<T>> args(argc);
+        for(T i = 0; i < args.size(); i++) {
+            T v = (T) (i % 600);
+            args[i] = {v + 2, v + 1, v};
+        }
 
         for(unsigned i = 0; i < repeats; i++) {
             T res = 0;
             auto start = chrono::high_resolution_clock::now();
             for(unsigned j = 0; j < iterations; j++) {
-                auto a = distrib(gen);
-                auto b = distrib(gen);
-                auto c = distrib(gen);
+                auto [a, b, c] = args[j % args.size()];
                 T ret = f(a, b, c);
-                res += ret % 2;
+                res += ret % 2 + 2;
                 res %= 1000000;
             }
             auto end = chrono::high_resolution_clock::now();
 
             auto ms_int = chrono::duration_cast<chrono::milliseconds>(end - start);
             int64_t time = ms_int.count();
-            if(time < min) {
-                min = time;
+            if(time < minTime) {
+                minTime = time;
                 ans = res;
             }
         }
         
-        cout << message << ' ' << min << "ms [out=" << ans << "]\n";
+        cout << message << ' ' << minTime << "ms [out=" << ans << "]\n";
     }
 };
 
 int main() {
-    random_device rd;
-    mt19937::result_type seed = rd() ^ (
-        (mt19937::result_type)
-        chrono::duration_cast<chrono::seconds>(
-            chrono::system_clock::now().time_since_epoch()
-            ).count() +
-        (mt19937::result_type)
-        chrono::duration_cast<chrono::microseconds>(
-            chrono::high_resolution_clock::now().time_since_epoch()
-            ).count() );
-
-    Tester tester(seed, 1000000000, 6);
+    Tester tester(1'500'000'000, 10, 10000);
 
     tester.test(cube_of_difference, "Cube of difference");
     tester.test(square_of_sum3, "Square of sum3");

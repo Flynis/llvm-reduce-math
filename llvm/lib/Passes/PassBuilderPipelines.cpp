@@ -644,8 +644,9 @@ PassBuilder::buildFunctionSimplificationPipeline(OptimizationLevel Level,
   // TODO: Investigate promotion cap for O1.
   LPM1.addPass(LICMPass(PTO.LicmMssaOptCap, PTO.LicmMssaNoAccForPromotionCap,
                         /*AllowSpeculation=*/true));
-  LPM1.addPass(
-      SimpleLoopUnswitchPass(/* NonTrivial */ Level == OptimizationLevel::O3));
+  LPM1.addPass(SimpleLoopUnswitchPass(/* NonTrivial */ 
+                                      Level == OptimizationLevel::O3 || 
+                                      Level == OptimizationLevel::O4));
   if (EnableLoopFlatten)
     LPM1.addPass(LoopFlattenPass());
 
@@ -937,12 +938,12 @@ PassBuilder::buildInlinerPipeline(OptimizationLevel Level,
 
   // When at O3 add argument promotion to the pass pipeline.
   // FIXME: It isn't at all clear why this should be limited to O3.
-  if (Level == OptimizationLevel::O3)
+  if (Level == OptimizationLevel::O3 || Level == OptimizationLevel::O4)
     MainCGPipeline.addPass(ArgumentPromotionPass());
 
   // Try to perform OpenMP specific optimizations. This is a (quick!) no-op if
   // there are no OpenMP runtime calls present in the module.
-  if (Level == OptimizationLevel::O2 || Level == OptimizationLevel::O3)
+  if (Level == OptimizationLevel::O2 || Level == OptimizationLevel::O3 || Level == OptimizationLevel::O4)
     MainCGPipeline.addPass(OpenMPOptCGSCCPass());
 
   invokeCGSCCOptimizerLateEPCallbacks(MainCGPipeline, Level);
@@ -1071,7 +1072,7 @@ PassBuilder::buildModuleSimplificationPipeline(OptimizationLevel Level,
     EarlyFPM.addPass(SimplifyCFGPass());
     EarlyFPM.addPass(SROAPass(SROAOptions::ModifyCFG));
     EarlyFPM.addPass(EarlyCSEPass());
-    if (Level == OptimizationLevel::O3)
+    if (Level == OptimizationLevel::O3 || Level == OptimizationLevel::O4)
       EarlyFPM.addPass(CallSiteSplittingPass());
     MPM.addPass(createModuleToFunctionPassAdaptor(
         std::move(EarlyFPM), PTO.EagerlyInvalidateAnalyses));
@@ -1247,8 +1248,9 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
     LoopPassManager LPM;
     LPM.addPass(LICMPass(PTO.LicmMssaOptCap, PTO.LicmMssaNoAccForPromotionCap,
                          /*AllowSpeculation=*/true));
-    LPM.addPass(SimpleLoopUnswitchPass(/* NonTrivial */ Level ==
-                                       OptimizationLevel::O3));
+    LPM.addPass(SimpleLoopUnswitchPass(/* NonTrivial */ 
+                                      Level == OptimizationLevel::O3 || 
+                                      Level == OptimizationLevel::O4));
     ExtraPasses.addPass(
         createFunctionToLoopPassAdaptor(std::move(LPM), /*UseMemorySSA=*/true,
                                         /*UseBlockFrequencyInfo=*/true));
@@ -1423,7 +1425,7 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
 
   // CHR pass should only be applied with the profile information.
   // The check is to check the profile summary information in CHR.
-  if (EnableCHR && Level == OptimizationLevel::O3)
+  if (EnableCHR && (Level == OptimizationLevel::O3 || Level == OptimizationLevel::O4))
     OptimizePM.addPass(ControlHeightReductionPass());
 
   // FIXME: We need to run some loop optimizations to re-rotate loops after
